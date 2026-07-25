@@ -18,7 +18,10 @@ import {
   AlignLeft,
   History,
   Trash2,
-  FolderOpen
+  FolderOpen,
+  User,
+  PenTool,
+  RotateCcw
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 
@@ -28,6 +31,7 @@ interface SavedJob {
   businessName: string;
   clientPhone: string;
   jobDescription: string;
+  technicianName: string;
   resultImage: string;
   locationText: string;
 }
@@ -49,19 +53,25 @@ export default function Home() {
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [locationText, setLocationText] = useState<string>('');
   const [jobDescription, setJobDescription] = useState<string>('');
+  const [technicianName, setTechnicianName] = useState<string>('');
+  const [clientSignatureData, setClientSignatureData] = useState<string | null>(null);
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
 
   useEffect(() => {
     const savedName = localStorage.getItem('verifield_biz_name');
     const savedPhone = localStorage.getItem('verifield_biz_phone');
     const savedLogo = localStorage.getItem('verifield_biz_logo');
+    const savedTech = localStorage.getItem('verifield_tech_name');
     const savedHistory = localStorage.getItem('verifield_saved_jobs');
 
     if (savedName) setBusinessName(savedName);
     if (savedPhone) setClientPhone(savedPhone);
     if (savedLogo) setLogoImage(savedLogo);
+    if (savedTech) setTechnicianName(savedTech);
     if (savedHistory) {
       try {
         setSavedJobs(JSON.parse(savedHistory));
@@ -71,10 +81,11 @@ export default function Home() {
     }
   }, []);
 
-  const handleSaveProfile = (name: string, phone: string, logo: string | null) => {
+  const handleSaveProfile = (name: string, phone: string, logo: string | null, tech: string) => {
     if (!isPro) return;
     localStorage.setItem('verifield_biz_name', name);
     localStorage.setItem('verifield_biz_phone', phone);
+    localStorage.setItem('verifield_tech_name', tech);
     if (logo) localStorage.setItem('verifield_biz_logo', logo);
   };
 
@@ -108,6 +119,71 @@ export default function Home() {
       return;
     }
     setJobDescription(val);
+  };
+
+  const handleTechNameChange = (val: string) => {
+    if (!isPro) {
+      setShowProModal(true);
+      return;
+    }
+    setTechnicianName(val);
+    handleSaveProfile(businessName, clientPhone, logoImage, val);
+  };
+
+  // Signature Pad Handlers
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isPro) {
+      setShowProModal(true);
+      return;
+    }
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !isPro) return;
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = signatureCanvasRef.current;
+    if (canvas) {
+      setClientSignatureData(canvas.toDataURL('image/png'));
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setClientSignatureData(null);
   };
 
   const handleImageUpload = (
@@ -169,22 +245,25 @@ export default function Home() {
     const imgBefore = new Image();
     const imgAfter = new Image();
     const imgLogo = logoImage ? new Image() : null;
+    const imgSig = clientSignatureData ? new Image() : null;
 
     imgBefore.src = beforeImage;
     imgAfter.src = afterImage;
     if (imgLogo) imgLogo.src = logoImage!;
+    if (imgSig) imgSig.src = clientSignatureData!;
 
     await Promise.all([
       new Promise((resolve) => (imgBefore.onload = resolve)),
       new Promise((resolve) => (imgAfter.onload = resolve)),
       imgLogo ? new Promise((resolve) => (imgLogo.onload = resolve)) : Promise.resolve(),
+      imgSig ? new Promise((resolve) => (imgSig.onload = resolve)) : Promise.resolve(),
     ]);
 
     const targetWidth = 1200;
-    const targetHeight = 800;
+    const targetHeight = 780;
     const headerHeight = 90;
-    const hasFooter = isPro && (enableTimestamp || jobDescription);
-    const footerHeight = hasFooter ? 65 : 0;
+    const hasFooter = isPro && (enableTimestamp || jobDescription || technicianName || clientSignatureData);
+    const footerHeight = hasFooter ? 85 : 0;
     const padding = 20;
 
     canvas.width = targetWidth;
@@ -202,7 +281,8 @@ export default function Home() {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '16px sans-serif';
-    ctx.fillText(`Generated: ${new Date().toLocaleDateString()}`, padding, 68);
+    const techDisplay = technicianName ? ` | Tech: ${technicianName}` : '';
+    ctx.fillText(`Generated: ${new Date().toLocaleDateString()}${techDisplay}`, padding, 68);
 
     if (imgLogo) {
       const logoMaxHeight = 60;
@@ -243,16 +323,25 @@ export default function Home() {
 
       if (enableTimestamp) {
         ctx.fillStyle = '#38bdf8';
-        ctx.font = 'bold 14px sans-serif';
+        ctx.font = 'bold 13px sans-serif';
         const timeStampText = `VERIFIED: ${new Date().toLocaleString()} | ${locationText || 'GPS Secured'}`;
-        ctx.fillText(timeStampText, padding, footerY + 25);
+        ctx.fillText(timeStampText, padding, footerY + 22);
       }
 
       if (jobDescription) {
         ctx.fillStyle = '#cbd5e1';
-        ctx.font = '13px sans-serif';
-        const descText = `NOTES: ${jobDescription.length > 90 ? jobDescription.substring(0, 90) + '...' : jobDescription}`;
-        ctx.fillText(descText, padding, footerY + (enableTimestamp ? 48 : 36));
+        ctx.font = '12px sans-serif';
+        const descText = `NOTES: ${jobDescription.length > 95 ? jobDescription.substring(0, 95) + '...' : jobDescription}`;
+        ctx.fillText(descText, padding, footerY + (enableTimestamp ? 42 : 25));
+      }
+
+      if (imgSig) {
+        const sigWidth = 140;
+        const sigHeight = 50;
+        ctx.drawImage(imgSig, canvas.width - sigWidth - padding, footerY + 15, sigWidth, sigHeight);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px sans-serif';
+        ctx.fillText('Client Approved Signature', canvas.width - sigWidth - padding, footerY + 74);
       }
     }
 
@@ -267,6 +356,7 @@ export default function Home() {
         businessName: businessName || 'My Business',
         clientPhone,
         jobDescription,
+        technicianName,
         resultImage: resultDataUrl,
         locationText
       };
@@ -307,11 +397,11 @@ export default function Home() {
     pdf.text(`Official Proof of Performance | Date: ${new Date().toLocaleDateString()}`, 14, 28);
 
     const imgWidth = pageWidth - 28;
-    const imgHeight = (imgWidth * 840) / 1200; 
-    pdf.addImage(generatedResult, 'PNG', 14, 48, imgWidth, imgHeight);
+    const imgHeight = (imgWidth * 780) / 1200; 
+    pdf.addImage(generatedResult, 'PNG', 14, 46, imgWidth, imgHeight);
 
-    let currentY = 48 + imgHeight + 10;
-    const boxHeight = jobDescription ? 42 : 30;
+    let currentY = 46 + imgHeight + 8;
+    const boxHeight = jobDescription ? 44 : 32;
 
     pdf.setDrawColor(226, 232, 240);
     pdf.setFillColor(248, 250, 252);
@@ -320,35 +410,39 @@ export default function Home() {
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(15, 23, 42);
-    pdf.text('VERIFICATION & WORK DETAILS', 20, currentY + 9);
+    pdf.text('VERIFICATION & WORK DETAILS', 20, currentY + 8);
 
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(71, 85, 105);
-    pdf.text(`Status: Service Completed & Verified`, 20, currentY + 17);
-    if (clientPhone) pdf.text(`Client Contact: ${clientPhone}`, 20, currentY + 23);
+    pdf.text(`Status: Service Completed & Verified`, 20, currentY + 16);
+    if (clientPhone) pdf.text(`Client Contact: ${clientPhone}`, 20, currentY + 22);
+    if (technicianName) pdf.text(`Service Tech: ${technicianName}`, 110, currentY + 16);
     if (enableTimestamp && locationText) {
-      pdf.text(`Timestamp: ${new Date().toLocaleString()} (${locationText})`, 110, currentY + 17);
+      pdf.text(`Timestamp: ${new Date().toLocaleString()} (${locationText})`, 110, currentY + 22);
     }
 
     if (jobDescription) {
       pdf.setFont('helvetica', 'bold');
       pdf.setTextColor(15, 23, 42);
-      pdf.text('Scope of Work:', 20, currentY + 31);
+      pdf.text('Scope of Work:', 20, currentY + 30);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(71, 85, 105);
       const splitDesc = pdf.splitTextToSize(jobDescription, pageWidth - 65);
-      pdf.text(splitDesc, 48, currentY + 31);
+      pdf.text(splitDesc, 48, currentY + 30);
     }
 
-    currentY += boxHeight + 12;
+    currentY += boxHeight + 8;
     pdf.setDrawColor(203, 213, 225);
-    pdf.line(14, currentY + 10, 90, currentY + 10);
+    pdf.line(14, currentY + 12, 90, currentY + 12);
     pdf.setFontSize(8);
-    pdf.text('Client Signature & Approval', 14, currentY + 15);
+    pdf.text(`Technician: ${technicianName || 'Verified Tech'}`, 14, currentY + 17);
 
-    pdf.line(pageWidth - 90, currentY + 10, pageWidth - 14, currentY + 10);
-    pdf.text('Service Technician Signature', pageWidth - 90, currentY + 15);
+    if (clientSignatureData) {
+      pdf.addImage(clientSignatureData, 'PNG', pageWidth - 85, currentY - 2, 60, 20);
+    }
+    pdf.line(pageWidth - 90, currentY + 12, pageWidth - 14, currentY + 12);
+    pdf.text('Client Signature & Approval', pageWidth - 90, currentY + 17);
 
     pdf.setFontSize(8);
     pdf.setTextColor(148, 163, 184);
@@ -434,21 +528,35 @@ export default function Home() {
           </h2>
           {!isPro && (
             <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 flex items-center gap-1">
-              <Lock className="w-3 h-3" /> Auto-Save Locked
+              <Lock className="w-3 h-3" /> Pro Features Locked
             </span>
           )}
         </div>
         
-        <input
-          type="text"
-          placeholder="Business / Company Name (Optional)"
-          value={businessName}
-          onChange={(e) => {
-            setBusinessName(e.target.value);
-            handleSaveProfile(e.target.value, clientPhone, logoImage);
-          }}
-          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input
+            type="text"
+            placeholder="Business / Company Name"
+            value={businessName}
+            onChange={(e) => {
+              setBusinessName(e.target.value);
+              handleSaveProfile(e.target.value, clientPhone, logoImage, technicianName);
+            }}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+          />
+
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Technician Name [PRO]"
+              value={technicianName}
+              onClick={() => { if (!isPro) setShowProModal(true); }}
+              onChange={(e) => handleTechNameChange(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 pr-8"
+            />
+            {!isPro && <Lock className="w-4 h-4 text-amber-400 absolute top-2.5 right-3 pointer-events-none" />}
+          </div>
+        </div>
 
         <input
           type="tel"
@@ -456,7 +564,7 @@ export default function Home() {
           value={clientPhone}
           onChange={(e) => {
             setClientPhone(e.target.value);
-            handleSaveProfile(businessName, e.target.value, logoImage);
+            handleSaveProfile(businessName, e.target.value, logoImage, technicianName);
           }}
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
         />
@@ -472,6 +580,52 @@ export default function Home() {
           />
           {!isPro && (
             <Lock className="w-4 h-4 text-amber-400 absolute top-2.5 right-3 pointer-events-none" />
+          )}
+        </div>
+
+        {/* Client Digital Signature Box */}
+        <div className="bg-slate-900/90 border border-slate-700 rounded-xl p-3 space-y-2 relative">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <PenTool className="w-3.5 h-3.5 text-blue-400" /> Customer Signature Pad {!isPro && '[PRO]'}
+            </span>
+            <button
+              type="button"
+              onClick={clearSignature}
+              className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 bg-slate-800 px-2 py-1 rounded border border-slate-700"
+            >
+              <RotateCcw className="w-3 h-3" /> Clear Pad
+            </button>
+          </div>
+          <div className="relative w-full h-28 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden cursor-crosshair">
+            <canvas
+              ref={signatureCanvasRef}
+              width={500}
+              height={110}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className="w-full h-full touch-none"
+            />
+            {!clientSignatureData && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-600 text-xs font-medium">
+                Customer signs here with finger or mouse
+              </div>
+            )}
+          </div>
+          {!isPro && (
+            <div 
+              onClick={() => setShowProModal(true)} 
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px] rounded-xl flex items-center justify-center cursor-pointer"
+            >
+              <span className="text-xs font-bold text-amber-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-amber-400/40 flex items-center gap-1.5 shadow-lg">
+                <Lock className="w-3.5 h-3.5" /> Unlock Signature Capture (PRO)
+              </span>
+            </div>
           )}
         </div>
 
@@ -611,6 +765,7 @@ export default function Home() {
                       setBusinessName(job.businessName);
                       setClientPhone(job.clientPhone);
                       setJobDescription(job.jobDescription);
+                      setTechnicianName(job.technicianName || '');
                       setShowHistoryModal(false);
                     }}
                     className="bg-slate-800/70 border border-slate-700/80 hover:border-blue-500 rounded-xl p-3 cursor-pointer transition-all flex gap-3 items-center"
@@ -622,7 +777,7 @@ export default function Home() {
                         <span className="text-[10px] text-slate-400">{job.date}</span>
                       </div>
                       <p className="text-xs text-slate-300 truncate mt-0.5">{job.jobDescription || 'No description notes'}</p>
-                      {job.clientPhone && <p className="text-[10px] text-blue-400 mt-1">Client: {job.clientPhone}</p>}
+                      {job.technicianName && <p className="text-[10px] text-blue-400 mt-1">Tech: {job.technicianName}</p>}
                     </div>
                     <button
                       onClick={(e) => deleteSavedJob(job.id, e)}
@@ -662,6 +817,22 @@ export default function Home() {
 
             <div className="space-y-3 text-xs text-slate-300">
               <div className="flex items-start gap-3">
+                <PenTool className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div>
+                  <strong className="text-white block">Digital Client Signature Pad</strong>
+                  Capture real-time signatures directly onto images and PDF sign-off reports.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <User className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div>
+                  <strong className="text-white block">Technician Attribution Name</strong>
+                  Stamp the technician's name on every proof and official export.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
                 <History className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div>
                   <strong className="text-white block">Past Jobs Vault & History</strong>
@@ -670,26 +841,10 @@ export default function Home() {
               </div>
 
               <div className="flex items-start gap-3">
-                <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                <div>
-                  <strong className="text-white block">Auto-Saved Profile & Logo</strong>
-                  Never re-type your company name or re-upload your logo again.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div>
                   <strong className="text-white block">GPS & Timestamp Watermark</strong>
                   Overlay exact date, time, and coordinates to prove when work was done.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <AlignLeft className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                <div>
-                  <strong className="text-white block">Job Notes & Scope of Work</strong>
-                  Add detailed job descriptions watermarked on images & PDF reports.
                 </div>
               </div>
             </div>
