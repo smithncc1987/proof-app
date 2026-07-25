@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, Image as ImageIcon, Download, Upload, ShieldCheck, Building, Share2, Send, Check } from 'lucide-react';
+import { Camera, Image as ImageIcon, Download, Upload, ShieldCheck, Building, Share2, Check } from 'lucide-react';
 
 export default function Home() {
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
@@ -113,7 +113,7 @@ export default function Home() {
     setGeneratedResult(canvas.toDataURL('image/png'));
   };
 
-  // Instant Native Share / SMS Handler
+  // Native Web Share / SMS / Email Handler
   const handleShare = async () => {
     if (!generatedResult) return;
 
@@ -131,7 +131,6 @@ export default function Home() {
         setSharedStatus(true);
         setTimeout(() => setSharedStatus(false), 3000);
       } else if (clientPhone) {
-        // Fallback to direct SMS protocol if Web Share isn't fully supported
         const smsMsg = encodeURIComponent(`Here is your work proof image from ${businessName || 'our team'}!`);
         window.open(`sms:${clientPhone}?body=${smsMsg}`, '_self');
       } else {
@@ -248,7 +247,7 @@ export default function Home() {
               className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-2 transition-colors"
             >
               {sharedStatus ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-              {sharedStatus ? 'Sent!' : 'Instant Share (SMS/Apps)'}
+              {sharedStatus ? 'Sent!' : 'Share to Client SMS/Email'}
             </button>
 
             <a
