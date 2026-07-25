@@ -14,7 +14,8 @@ import {
   MapPin, 
   Clock, 
   X,
-  FileText
+  FileText,
+  AlignLeft
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 
@@ -33,6 +34,7 @@ export default function Home() {
   const [enableTimestamp, setEnableTimestamp] = useState<boolean>(false);
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [locationText, setLocationText] = useState<string>('');
+  const [jobDescription, setJobDescription] = useState<string>('');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -78,6 +80,14 @@ export default function Home() {
     }
     setEnableTimestamp(checked);
     if (checked) fetchLocation();
+  };
+
+  const handleJobDescChange = (val: string) => {
+    if (!isPro) {
+      setShowProModal(true);
+      return;
+    }
+    setJobDescription(val);
   };
 
   const handleImageUpload = (
@@ -153,7 +163,8 @@ export default function Home() {
     const targetWidth = 1200;
     const targetHeight = 800;
     const headerHeight = 90;
-    const footerHeight = enableTimestamp && isPro ? 40 : 0;
+    const hasFooter = isPro && (enableTimestamp || jobDescription);
+    const footerHeight = hasFooter ? 65 : 0;
     const padding = 20;
 
     canvas.width = targetWidth;
@@ -205,21 +216,30 @@ export default function Home() {
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('AFTER', afterX + 30, topOffset + 34);
 
-    if (enableTimestamp && isPro) {
+    // Pro Footer Watermark
+    if (hasFooter) {
       const footerY = canvas.height - footerHeight;
       ctx.fillStyle = '#020617';
       ctx.fillRect(0, footerY, canvas.width, footerHeight);
 
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 14px sans-serif';
-      const timeStampText = `VERIFIED: ${new Date().toLocaleString()} | ${locationText || 'GPS Secured'}`;
-      ctx.fillText(timeStampText, padding, footerY + 25);
+      if (enableTimestamp) {
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 14px sans-serif';
+        const timeStampText = `VERIFIED: ${new Date().toLocaleString()} | ${locationText || 'GPS Secured'}`;
+        ctx.fillText(timeStampText, padding, footerY + 25);
+      }
+
+      if (jobDescription) {
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '13px sans-serif';
+        const descText = `NOTES: ${jobDescription.length > 90 ? jobDescription.substring(0, 90) + '...' : jobDescription}`;
+        ctx.fillText(descText, padding, footerY + (enableTimestamp ? 48 : 36));
+      }
     }
 
     setGeneratedResult(canvas.toDataURL('image/png'));
   };
 
-  // Export Professional PDF Document
   const exportPDF = () => {
     if (!isPro) {
       setShowProModal(true);
@@ -230,8 +250,8 @@ export default function Home() {
     const pdf = new jsPDF('portrait', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
 
-    // Document Title Header
-    pdf.setFillColor(15, 23, 42); // #0f172a slate
+    // Document Header
+    pdf.setFillColor(15, 23, 42);
     pdf.rect(0, 0, pageWidth, 40, 'F');
 
     pdf.setTextColor(255, 255, 255);
@@ -244,42 +264,54 @@ export default function Home() {
     pdf.setTextColor(148, 163, 184);
     pdf.text(`Official Proof of Performance | Date: ${new Date().toLocaleDateString()}`, 14, 28);
 
-    // Render Proof Canvas Image into PDF
+    // Proof Canvas Image
     const imgWidth = pageWidth - 28;
     const imgHeight = (imgWidth * 840) / 1200; 
     pdf.addImage(generatedResult, 'PNG', 14, 48, imgWidth, imgHeight);
 
-    // Client & Verification Details Box
-    let currentY = 48 + imgHeight + 12;
+    // Details Box
+    let currentY = 48 + imgHeight + 10;
+    const boxHeight = jobDescription ? 42 : 30;
+
     pdf.setDrawColor(226, 232, 240);
     pdf.setFillColor(248, 250, 252);
-    pdf.roundedRect(14, currentY, pageWidth - 28, 32, 3, 3, 'FD');
+    pdf.roundedRect(14, currentY, pageWidth - 28, boxHeight, 3, 3, 'FD');
 
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(15, 23, 42);
-    pdf.text('VERIFICATION DETAILS', 20, currentY + 10);
+    pdf.text('VERIFICATION & WORK DETAILS', 20, currentY + 9);
 
     pdf.setFontSize(9);
     pdf.setFont('helvetica', 'normal');
     pdf.setTextColor(71, 85, 105);
-    pdf.text(`Status: Service Completed & Verified`, 20, currentY + 18);
-    if (clientPhone) pdf.text(`Client Contact: ${clientPhone}`, 20, currentY + 24);
+    pdf.text(`Status: Service Completed & Verified`, 20, currentY + 17);
+    if (clientPhone) pdf.text(`Client Contact: ${clientPhone}`, 20, currentY + 23);
     if (enableTimestamp && locationText) {
-      pdf.text(`Timestamp: ${new Date().toLocaleString()} (${locationText})`, 110, currentY + 18);
+      pdf.text(`Timestamp: ${new Date().toLocaleString()} (${locationText})`, 110, currentY + 17);
     }
 
-    // Sign-Off Signature Line
-    currentY += 44;
+    if (jobDescription) {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('Scope of Work:', 20, currentY + 31);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(71, 85, 105);
+      const splitDesc = pdf.splitTextToSize(jobDescription, pageWidth - 65);
+      pdf.text(splitDesc, 48, currentY + 31);
+    }
+
+    // Sign-Off Line
+    currentY += boxHeight + 12;
     pdf.setDrawColor(203, 213, 225);
-    pdf.line(14, currentY + 12, 90, currentY + 12);
+    pdf.line(14, currentY + 10, 90, currentY + 10);
     pdf.setFontSize(8);
-    pdf.text('Client Signature & Approval', 14, currentY + 17);
+    pdf.text('Client Signature & Approval', 14, currentY + 15);
 
-    pdf.line(pageWidth - 90, currentY + 12, pageWidth - 14, currentY + 12);
-    pdf.text('Service Technician Signature', pageWidth - 90, currentY + 17);
+    pdf.line(pageWidth - 90, currentY + 10, pageWidth - 14, currentY + 10);
+    pdf.text('Service Technician Signature', pageWidth - 90, currentY + 15);
 
-    // Footer Branding
+    // Footer
     pdf.setFontSize(8);
     pdf.setTextColor(148, 163, 184);
     pdf.text('Generated via VeriField Work Verification Platform', pageWidth / 2, 285, { align: 'center' });
@@ -373,6 +405,21 @@ export default function Home() {
           }}
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
         />
+
+        {/* Pro Job Scope / Description Area */}
+        <div className="relative">
+          <textarea
+            placeholder="Job Notes / Scope of Work (e.g. Replaced filter, cleaned drain line) [PRO]"
+            value={jobDescription}
+            onClick={() => { if (!isPro) setShowProModal(true); }}
+            onChange={(e) => handleJobDescChange(e.target.value)}
+            rows={2}
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+          />
+          {!isPro && (
+            <Lock className="w-4 h-4 text-amber-400 absolute top-2.5 right-3 pointer-events-none" />
+          )}
+        </div>
 
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-3">
@@ -471,7 +518,6 @@ export default function Home() {
               <Download className="w-3.5 h-3.5" /> Save PNG
             </a>
 
-            {/* Pro PDF Export Button */}
             <button
               onClick={exportPDF}
               className="py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors relative"
@@ -518,6 +564,14 @@ export default function Home() {
                 <div>
                   <strong className="text-white block">GPS & Timestamp Watermark</strong>
                   Overlay exact date, time, and coordinates to prove when work was done.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <AlignLeft className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div>
+                  <strong className="text-white block">Job Notes & Scope of Work</strong>
+                  Add detailed job descriptions watermarked on images & PDF reports.
                 </div>
               </div>
 
