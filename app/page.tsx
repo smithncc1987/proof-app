@@ -71,16 +71,8 @@ export default function Home() {
       setIsPro(true);
     }
 
-    const savedName = localStorage.getItem('verifield_biz_name');
-    const savedPhone = localStorage.getItem('verifield_biz_phone');
-    const savedLogo = localStorage.getItem('verifield_biz_logo');
-    const savedTech = localStorage.getItem('verifield_tech_name');
+    // Only load saved job history vault if it exists, leaving input fields blank for fresh visitors
     const savedHistory = localStorage.getItem('verifield_saved_jobs');
-
-    if (savedName) setBusinessName(savedName);
-    if (savedPhone) setClientPhone(savedPhone);
-    if (savedLogo) setLogoImage(savedLogo);
-    if (savedTech) setTechnicianName(savedTech);
     if (savedHistory) {
       try {
         setSavedJobs(JSON.parse(savedHistory));
