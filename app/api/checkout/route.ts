@@ -7,6 +7,7 @@ export async function POST(req: Request) {
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_collection: 'if_required',
+      managed_payments: { enabled: false },
       line_items: [
         {
           price_data: {
