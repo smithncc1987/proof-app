@@ -27,8 +27,8 @@ export default function Home() {
     }
   };
 
-  // Helper function to draw images without stretching (aspect ratio cover fit)
-  const drawCoverImage = (
+  // Helper function to draw full images without cropping or stretching (contain fit)
+  const drawContainImage = (
     ctx: CanvasRenderingContext2D,
     img: HTMLImageElement,
     x: number,
@@ -36,28 +36,29 @@ export default function Home() {
     w: number,
     h: number
   ) => {
+    // Fill photo box background dark slate
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(x, y, w, h);
+
     const imgAspect = img.width / img.height;
     const boxAspect = w / h;
     let renderW, renderH, offsetX, offsetY;
 
     if (imgAspect > boxAspect) {
-      renderH = h;
-      renderW = h * imgAspect;
-      offsetX = x - (renderW - w) / 2;
-      offsetY = y;
-    } else {
+      // Photo is wider than the box
       renderW = w;
       renderH = w / imgAspect;
       offsetX = x;
-      offsetY = y - (renderH - h) / 2;
+      offsetY = y + (h - renderH) / 2;
+    } else {
+      // Photo is taller than the box
+      renderW = h * imgAspect;
+      renderH = h;
+      offsetX = x + (w - renderW) / 2;
+      offsetY = y;
     }
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
     ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
-    ctx.restore();
   };
 
   const generateProof = async () => {
@@ -81,7 +82,7 @@ export default function Home() {
       imgLogo ? new Promise((resolve) => (imgLogo.onload = resolve)) : Promise.resolve(),
     ]);
 
-    // Setup side-by-side dimensions
+    // Setup canvas dimensions
     const targetWidth = 1200;
     const targetHeight = 800;
     const headerHeight = 90;
@@ -121,22 +122,22 @@ export default function Home() {
       );
     }
 
-    // Proportional Image Dimensions for Side-by-Side
+    // Side-by-side box dimensions
     const imgW = (targetWidth - padding * 3) / 2;
     const imgH = targetHeight - padding * 2;
     const topOffset = headerHeight + padding;
 
-    // Draw Before Frame (Proportional)
-    drawCoverImage(ctx, imgBefore, padding, topOffset, imgW, imgH);
+    // Draw Before Frame (Uncropped Contain)
+    drawContainImage(ctx, imgBefore, padding, topOffset, imgW, imgH);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
     ctx.fillRect(padding + 10, topOffset + 10, 100, 36);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('BEFORE', padding + 25, topOffset + 34);
 
-    // Draw After Frame (Proportional)
+    // Draw After Frame (Uncropped Contain)
     const afterX = padding * 2 + imgW;
-    drawCoverImage(ctx, imgAfter, afterX, topOffset, imgW, imgH);
+    drawContainImage(ctx, imgAfter, afterX, topOffset, imgW, imgH);
     ctx.fillStyle = 'rgba(34, 197, 94, 0.85)';
     ctx.fillRect(afterX + 10, topOffset + 10, 100, 36);
     ctx.fillStyle = '#ffffff';
