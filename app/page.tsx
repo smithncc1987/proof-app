@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, Image as ImageIcon, Download, Upload, ShieldCheck, Building, Share2, Check } from 'lucide-react';
+import { Camera, Image as ImageIcon, Download, Upload, Building, Share2, Check } from 'lucide-react';
 
 export default function Home() {
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
@@ -177,10 +177,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 max-w-2xl mx-auto">
+      {/* Official VeriField Header with SVG Logo */}
       <header className="py-4 border-b border-slate-800 mb-6 text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <ShieldCheck className="w-7 h-7 text-blue-500" />
-          <h1 className="text-2xl font-bold text-white">VeriField</h1>
+        <div className="flex items-center justify-center mb-1">
+          <img src="/logo.svg" alt="VeriField Logo" className="h-10 w-auto object-contain" />
         </div>
         <p className="text-xs text-slate-400">Before & After Work Verification</p>
       </header>
