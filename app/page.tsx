@@ -15,9 +15,22 @@ import {
   Clock, 
   X,
   FileText,
-  AlignLeft
+  AlignLeft,
+  History,
+  Trash2,
+  FolderOpen
 } from 'lucide-react';
 import jsPDF from 'jspdf';
+
+interface SavedJob {
+  id: string;
+  date: string;
+  businessName: string;
+  clientPhone: string;
+  jobDescription: string;
+  resultImage: string;
+  locationText: string;
+}
 
 export default function Home() {
   // Free State
@@ -31,10 +44,12 @@ export default function Home() {
   // Pro State & Features
   const [isPro, setIsPro] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
   const [enableTimestamp, setEnableTimestamp] = useState<boolean>(false);
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [locationText, setLocationText] = useState<string>('');
   const [jobDescription, setJobDescription] = useState<string>('');
+  const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -42,17 +57,22 @@ export default function Home() {
     const savedName = localStorage.getItem('verifield_biz_name');
     const savedPhone = localStorage.getItem('verifield_biz_phone');
     const savedLogo = localStorage.getItem('verifield_biz_logo');
+    const savedHistory = localStorage.getItem('verifield_saved_jobs');
 
     if (savedName) setBusinessName(savedName);
     if (savedPhone) setClientPhone(savedPhone);
     if (savedLogo) setLogoImage(savedLogo);
+    if (savedHistory) {
+      try {
+        setSavedJobs(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error('Failed to parse saved jobs', e);
+      }
+    }
   }, []);
 
   const handleSaveProfile = (name: string, phone: string, logo: string | null) => {
-    if (!isPro) {
-      setShowProModal(true);
-      return;
-    }
+    if (!isPro) return;
     localStorage.setItem('verifield_biz_name', name);
     localStorage.setItem('verifield_biz_phone', phone);
     if (logo) localStorage.setItem('verifield_biz_logo', logo);
@@ -216,7 +236,6 @@ export default function Home() {
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('AFTER', afterX + 30, topOffset + 34);
 
-    // Pro Footer Watermark
     if (hasFooter) {
       const footerY = canvas.height - footerHeight;
       ctx.fillStyle = '#020617';
@@ -237,7 +256,31 @@ export default function Home() {
       }
     }
 
-    setGeneratedResult(canvas.toDataURL('image/png'));
+    const resultDataUrl = canvas.toDataURL('image/png');
+    setGeneratedResult(resultDataUrl);
+
+    // Save to History Vault if Pro
+    if (isPro) {
+      const newJob: SavedJob = {
+        id: Date.now().toString(),
+        date: new Date().toLocaleString(),
+        businessName: businessName || 'My Business',
+        clientPhone,
+        jobDescription,
+        resultImage: resultDataUrl,
+        locationText
+      };
+      const updatedJobs = [newJob, ...savedJobs];
+      setSavedJobs(updatedJobs);
+      localStorage.setItem('verifield_saved_jobs', JSON.stringify(updatedJobs));
+    }
+  };
+
+  const deleteSavedJob = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const filtered = savedJobs.filter((job) => job.id !== id);
+    setSavedJobs(filtered);
+    localStorage.setItem('verifield_saved_jobs', JSON.stringify(filtered));
   };
 
   const exportPDF = () => {
@@ -250,7 +293,6 @@ export default function Home() {
     const pdf = new jsPDF('portrait', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
 
-    // Document Header
     pdf.setFillColor(15, 23, 42);
     pdf.rect(0, 0, pageWidth, 40, 'F');
 
@@ -264,12 +306,10 @@ export default function Home() {
     pdf.setTextColor(148, 163, 184);
     pdf.text(`Official Proof of Performance | Date: ${new Date().toLocaleDateString()}`, 14, 28);
 
-    // Proof Canvas Image
     const imgWidth = pageWidth - 28;
     const imgHeight = (imgWidth * 840) / 1200; 
     pdf.addImage(generatedResult, 'PNG', 14, 48, imgWidth, imgHeight);
 
-    // Details Box
     let currentY = 48 + imgHeight + 10;
     const boxHeight = jobDescription ? 42 : 30;
 
@@ -301,7 +341,6 @@ export default function Home() {
       pdf.text(splitDesc, 48, currentY + 31);
     }
 
-    // Sign-Off Line
     currentY += boxHeight + 12;
     pdf.setDrawColor(203, 213, 225);
     pdf.line(14, currentY + 10, 90, currentY + 10);
@@ -311,7 +350,6 @@ export default function Home() {
     pdf.line(pageWidth - 90, currentY + 10, pageWidth - 14, currentY + 10);
     pdf.text('Service Technician Signature', pageWidth - 90, currentY + 15);
 
-    // Footer
     pdf.setFontSize(8);
     pdf.setTextColor(148, 163, 184);
     pdf.text('Generated via VeriField Work Verification Platform', pageWidth / 2, 285, { align: 'center' });
@@ -349,9 +387,26 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 max-w-2xl mx-auto relative">
       <header className="py-4 border-b border-slate-800 mb-6 flex items-center justify-between">
-        <div className="flex-1 text-center pl-12">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (!isPro) {
+                setShowProModal(true);
+              } else {
+                setShowHistoryModal(true);
+              }
+            }}
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 relative flex items-center gap-1.5 text-xs font-medium"
+          >
+            <History className="w-4 h-4 text-blue-400" />
+            <span className="hidden sm:inline">Vault</span>
+            {!isPro && <Lock className="w-3 h-3 text-amber-400 absolute -top-1 -right-1" />}
+          </button>
+        </div>
+
+        <div className="flex-1 text-center px-2">
           <div className="flex items-center justify-center mb-1">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" className="h-10 w-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" className="h-9 w-auto">
               <rect x="10" y="10" width="36" height="44" rx="5" fill="#334155" stroke="#475569" strokeWidth="2" />
               <rect x="20" y="6" width="16" height="7" rx="2" fill="#38bdf8" />
               <path d="M 18 32 L 25 39 L 38 22" fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
@@ -360,14 +415,14 @@ export default function Home() {
               </text>
             </svg>
           </div>
-          <p className="text-xs text-slate-400">Before & After Work Verification</p>
+          <p className="text-[11px] text-slate-400">Before & After Work Verification</p>
         </div>
 
         <button
           onClick={() => setShowProModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 font-bold text-xs shadow-md hover:opacity-90 transition-opacity"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 font-bold text-xs shadow-md hover:opacity-90 transition-opacity shrink-0"
         >
-          <Sparkles className="w-3.5 h-3.5" /> {isPro ? 'PRO ACTIVE' : 'UPGRADE'}
+          <Sparkles className="w-3.5 h-3.5" /> {isPro ? 'PRO' : 'UPGRADE'}
         </button>
       </header>
 
@@ -406,7 +461,6 @@ export default function Home() {
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
         />
 
-        {/* Pro Job Scope / Description Area */}
         <div className="relative">
           <textarea
             placeholder="Job Notes / Scope of Work (e.g. Replaced filter, cleaned drain line) [PRO]"
@@ -529,6 +583,62 @@ export default function Home() {
         </div>
       )}
 
+      {/* PAST JOBS VAULT MODAL */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-5 max-w-lg w-full space-y-4 relative shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <FolderOpen className="w-5 h-5 text-blue-400" /> Past Jobs Vault ({savedJobs.length})
+              </h3>
+              <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto space-y-3 flex-1 pr-1">
+              {savedJobs.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 space-y-2">
+                  <History className="w-8 h-8 mx-auto opacity-40" />
+                  <p className="text-xs">No saved jobs yet. Generate a proof to store it here automatically!</p>
+                </div>
+              ) : (
+                savedJobs.map((job) => (
+                  <div 
+                    key={job.id} 
+                    onClick={() => {
+                      setGeneratedResult(job.resultImage);
+                      setBusinessName(job.businessName);
+                      setClientPhone(job.clientPhone);
+                      setJobDescription(job.jobDescription);
+                      setShowHistoryModal(false);
+                    }}
+                    className="bg-slate-800/70 border border-slate-700/80 hover:border-blue-500 rounded-xl p-3 cursor-pointer transition-all flex gap-3 items-center"
+                  >
+                    <img src={job.resultImage} alt="Thumbnail" className="w-20 h-14 object-cover rounded border border-slate-700 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white truncate">{job.businessName}</span>
+                        <span className="text-[10px] text-slate-400">{job.date}</span>
+                      </div>
+                      <p className="text-xs text-slate-300 truncate mt-0.5">{job.jobDescription || 'No description notes'}</p>
+                      {job.clientPhone && <p className="text-[10px] text-blue-400 mt-1">Client: {job.clientPhone}</p>}
+                    </div>
+                    <button
+                      onClick={(e) => deleteSavedJob(job.id, e)}
+                      className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                      title="Delete Job"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* PRO UPGRADE MODAL WINDOW */}
       {showProModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -552,6 +662,14 @@ export default function Home() {
 
             <div className="space-y-3 text-xs text-slate-300">
               <div className="flex items-start gap-3">
+                <History className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div>
+                  <strong className="text-white block">Past Jobs Vault & History</strong>
+                  Store and re-access all generated work logs directly on your device.
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
                 <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div>
                   <strong className="text-white block">Auto-Saved Profile & Logo</strong>
@@ -572,14 +690,6 @@ export default function Home() {
                 <div>
                   <strong className="text-white block">Job Notes & Scope of Work</strong>
                   Add detailed job descriptions watermarked on images & PDF reports.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <FileText className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                <div>
-                  <strong className="text-white block">PDF Summary Report Export</strong>
-                  Generate printable invoice attachments and job receipts for clients.
                 </div>
               </div>
             </div>
