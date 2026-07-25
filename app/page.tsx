@@ -27,6 +27,39 @@ export default function Home() {
     }
   };
 
+  // Helper function to draw images without stretching (aspect ratio cover fit)
+  const drawCoverImage = (
+    ctx: CanvasRenderingContext2D,
+    img: HTMLImageElement,
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ) => {
+    const imgAspect = img.width / img.height;
+    const boxAspect = w / h;
+    let renderW, renderH, offsetX, offsetY;
+
+    if (imgAspect > boxAspect) {
+      renderH = h;
+      renderW = h * imgAspect;
+      offsetX = x - (renderW - w) / 2;
+      offsetY = y;
+    } else {
+      renderW = w;
+      renderH = w / imgAspect;
+      offsetX = x;
+      offsetY = y - (renderH - h) / 2;
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
+    ctx.restore();
+  };
+
   const generateProof = async () => {
     if (!beforeImage || !afterImage) return;
 
@@ -48,7 +81,7 @@ export default function Home() {
       imgLogo ? new Promise((resolve) => (imgLogo.onload = resolve)) : Promise.resolve(),
     ]);
 
-    // Canvas size setup
+    // Setup side-by-side dimensions
     const targetWidth = 1200;
     const targetHeight = 800;
     const headerHeight = 90;
@@ -57,7 +90,7 @@ export default function Home() {
     canvas.width = targetWidth;
     canvas.height = targetHeight + headerHeight;
 
-    // Fill dark background
+    // Background
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -65,7 +98,7 @@ export default function Home() {
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Title / Business Name Text
+    // Business Name / Title
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 28px sans-serif';
     ctx.fillText(businessName || 'Job Proof Verification', padding, 40);
@@ -88,22 +121,22 @@ export default function Home() {
       );
     }
 
-    // Image Dimensions for Side-by-Side
+    // Proportional Image Dimensions for Side-by-Side
     const imgW = (targetWidth - padding * 3) / 2;
     const imgH = targetHeight - padding * 2;
     const topOffset = headerHeight + padding;
 
-    // Draw Before Frame
-    ctx.drawImage(imgBefore, padding, topOffset, imgW, imgH);
+    // Draw Before Frame (Proportional)
+    drawCoverImage(ctx, imgBefore, padding, topOffset, imgW, imgH);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
     ctx.fillRect(padding + 10, topOffset + 10, 100, 36);
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('BEFORE', padding + 25, topOffset + 34);
 
-    // Draw After Frame
+    // Draw After Frame (Proportional)
     const afterX = padding * 2 + imgW;
-    ctx.drawImage(imgAfter, afterX, topOffset, imgW, imgH);
+    drawCoverImage(ctx, imgAfter, afterX, topOffset, imgW, imgH);
     ctx.fillStyle = 'rgba(34, 197, 94, 0.85)';
     ctx.fillRect(afterX + 10, topOffset + 10, 100, 36);
     ctx.fillStyle = '#ffffff';
@@ -113,7 +146,7 @@ export default function Home() {
     setGeneratedResult(canvas.toDataURL('image/png'));
   };
 
-  // Native Web Share / SMS / Email Handler
+  // Web Share / SMS / Email Handler
   const handleShare = async () => {
     if (!generatedResult) return;
 
