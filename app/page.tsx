@@ -98,7 +98,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-900 text-white p-4 max-w-md mx-auto">
       <header className="py-4 border-b border-slate-800 mb-6 text-center">
-        <h1 className="text-2xl font-bold text-blue-500">ProofCam MVP</h1>
+        <h1 className="text-2xl font-bold text-blue-500">VeriField</h1>
         <p className="text-xs text-slate-400">Before & After Work Verification</p>
       </header>
 

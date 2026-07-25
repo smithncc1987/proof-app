@@ -1,6 +1,6 @@
 {
   "name": "ProofCam",
-  "short_name": "ProofCam",
+  "short_name": "VeriField",
   "description": "Before & After Work Verification App",
   "start_url": "/",
   "display": "standalone",
