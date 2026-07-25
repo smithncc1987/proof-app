@@ -1,14 +1,16 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Camera, Image as ImageIcon, Download, Upload, ShieldCheck, Building } from 'lucide-react';
+import { Camera, Image as ImageIcon, Download, Upload, ShieldCheck, Building, Share2, Send, Check } from 'lucide-react';
 
 export default function Home() {
   const [beforeImage, setBeforeImage] = useState<string | null>(null);
   const [afterImage, setAfterImage] = useState<string | null>(null);
   const [logoImage, setLogoImage] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState<string>('');
+  const [clientPhone, setClientPhone] = useState<string>('');
   const [generatedResult, setGeneratedResult] = useState<string | null>(null);
+  const [sharedStatus, setSharedStatus] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const handleImageUpload = (
@@ -111,20 +113,49 @@ export default function Home() {
     setGeneratedResult(canvas.toDataURL('image/png'));
   };
 
+  // Instant Native Share / SMS Handler
+  const handleShare = async () => {
+    if (!generatedResult) return;
+
+    try {
+      const response = await fetch(generatedResult);
+      const blob = await response.blob();
+      const file = new File([blob], 'Work-Proof-Verification.png', { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'Work Verification Proof',
+          text: `Here is the before & after work verification proof from ${businessName || 'our team'}!`,
+          files: [file],
+        });
+        setSharedStatus(true);
+        setTimeout(() => setSharedStatus(false), 3000);
+      } else if (clientPhone) {
+        // Fallback to direct SMS protocol if Web Share isn't fully supported
+        const smsMsg = encodeURIComponent(`Here is your work proof image from ${businessName || 'our team'}!`);
+        window.open(`sms:${clientPhone}?body=${smsMsg}`, '_self');
+      } else {
+        alert('Web Share is not supported on this browser. You can use the Download button to save and send manually.');
+      }
+    } catch (err) {
+      console.error('Error sharing image:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 max-w-2xl mx-auto">
       <header className="py-4 border-b border-slate-800 mb-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-1">
           <ShieldCheck className="w-7 h-7 text-blue-500" />
-          <h1 className="text-2xl font-bold text-white">JobSnap</h1>
+          <h1 className="text-2xl font-bold text-white">VeriField</h1>
         </div>
         <p className="text-xs text-slate-400">Before & After Work Verification</p>
       </header>
 
-      {/* Branding Section */}
+      {/* Branding & Client Contact Section */}
       <section className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/50 mb-6 space-y-3">
         <h2 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-          <Building className="w-4 h-4 text-blue-400" /> Custom Business Branding
+          <Building className="w-4 h-4 text-blue-400" /> Business Branding & Client Setup
         </h2>
         
         <input
@@ -132,6 +163,14 @@ export default function Home() {
           placeholder="Business / Company Name (Optional)"
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
+          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+        />
+
+        <input
+          type="tel"
+          placeholder="Client Phone # (Optional for Direct SMS)"
+          value={clientPhone}
+          onChange={(e) => setClientPhone(e.target.value)}
           className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
         />
 
@@ -202,13 +241,24 @@ export default function Home() {
         <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700 space-y-3">
           <h3 className="text-xs font-bold text-slate-300">RESULT PREVIEW</h3>
           <img src={generatedResult} alt="Generated Proof" className="rounded-lg border border-slate-700 w-full" />
-          <a
-            href={generatedResult}
-            download="Branded-Work-Proof.png"
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-2"
-          >
-            <Download className="w-4 h-4" /> Download Proof Image
-          </a>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleShare}
+              className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-2 transition-colors"
+            >
+              {sharedStatus ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+              {sharedStatus ? 'Sent!' : 'Instant Share (SMS/Apps)'}
+            </button>
+
+            <a
+              href={generatedResult}
+              download="Branded-Work-Proof.png"
+              className="py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-2 text-center"
+            >
+              <Download className="w-4 h-4" /> Download Image
+            </a>
+          </div>
         </div>
       )}
     </div>
