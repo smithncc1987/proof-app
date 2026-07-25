@@ -16,6 +16,7 @@ import {
   X,
   FileText
 } from 'lucide-react';
+import jsPDF from 'jspdf';
 
 export default function Home() {
   // Free State
@@ -27,7 +28,7 @@ export default function Home() {
   const [sharedStatus, setSharedStatus] = useState<boolean>(false);
   
   // Pro State & Features
-  const [isPro, setIsPro] = useState<boolean>(false); // Set true to simulate Pro user
+  const [isPro, setIsPro] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState<boolean>(false);
   const [enableTimestamp, setEnableTimestamp] = useState<boolean>(false);
   const [logoImage, setLogoImage] = useState<string | null>(null);
@@ -35,7 +36,6 @@ export default function Home() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Load Saved Pro Data from LocalStorage on Startup
   useEffect(() => {
     const savedName = localStorage.getItem('verifield_biz_name');
     const savedPhone = localStorage.getItem('verifield_biz_phone');
@@ -46,7 +46,6 @@ export default function Home() {
     if (savedLogo) setLogoImage(savedLogo);
   }, []);
 
-  // Save Business Info to LocalStorage
   const handleSaveProfile = (name: string, phone: string, logo: string | null) => {
     if (!isPro) {
       setShowProModal(true);
@@ -57,7 +56,6 @@ export default function Home() {
     if (logo) localStorage.setItem('verifield_biz_logo', logo);
   };
 
-  // Get Current Location for Timestamp
   const fetchLocation = () => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -66,9 +64,7 @@ export default function Home() {
           const lng = pos.coords.longitude.toFixed(3);
           setLocationText(`GPS: ${lat}, ${lng}`);
         },
-        () => {
-          setLocationText('GPS: Location Secured');
-        }
+        () => setLocationText('GPS: Location Secured')
       );
     } else {
       setLocationText('GPS: Location Secured');
@@ -103,7 +99,6 @@ export default function Home() {
     }
   };
 
-  // Helper function to draw full images without cropping or stretching (contain fit)
   const drawContainImage = (
     ctx: CanvasRenderingContext2D,
     img: HTMLImageElement,
@@ -164,15 +159,12 @@ export default function Home() {
     canvas.width = targetWidth;
     canvas.height = targetHeight + headerHeight + footerHeight;
 
-    // Background
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Header Bar
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Business Name / Title
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 28px sans-serif';
     ctx.fillText(businessName || 'Job Proof Verification', padding, 40);
@@ -181,7 +173,6 @@ export default function Home() {
     ctx.font = '16px sans-serif';
     ctx.fillText(`Generated: ${new Date().toLocaleDateString()}`, padding, 68);
 
-    // Draw Watermark Logo in Top Right
     if (imgLogo) {
       const logoMaxHeight = 60;
       const logoAspect = imgLogo.width / imgLogo.height;
@@ -195,7 +186,6 @@ export default function Home() {
       );
     }
 
-    // Side-by-side Photo Drawing
     const imgW = (targetWidth - padding * 3) / 2;
     const imgH = targetHeight - padding * 2;
     const topOffset = headerHeight + padding;
@@ -215,7 +205,6 @@ export default function Home() {
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('AFTER', afterX + 30, topOffset + 34);
 
-    // Pro Footer Watermark (Timestamp & GPS)
     if (enableTimestamp && isPro) {
       const footerY = canvas.height - footerHeight;
       ctx.fillStyle = '#020617';
@@ -228,6 +217,74 @@ export default function Home() {
     }
 
     setGeneratedResult(canvas.toDataURL('image/png'));
+  };
+
+  // Export Professional PDF Document
+  const exportPDF = () => {
+    if (!isPro) {
+      setShowProModal(true);
+      return;
+    }
+    if (!generatedResult) return;
+
+    const pdf = new jsPDF('portrait', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+
+    // Document Title Header
+    pdf.setFillColor(15, 23, 42); // #0f172a slate
+    pdf.rect(0, 0, pageWidth, 40, 'F');
+
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(businessName || 'Work Completion Report', 14, 20);
+
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`Official Proof of Performance | Date: ${new Date().toLocaleDateString()}`, 14, 28);
+
+    // Render Proof Canvas Image into PDF
+    const imgWidth = pageWidth - 28;
+    const imgHeight = (imgWidth * 840) / 1200; 
+    pdf.addImage(generatedResult, 'PNG', 14, 48, imgWidth, imgHeight);
+
+    // Client & Verification Details Box
+    let currentY = 48 + imgHeight + 12;
+    pdf.setDrawColor(226, 232, 240);
+    pdf.setFillColor(248, 250, 252);
+    pdf.roundedRect(14, currentY, pageWidth - 28, 32, 3, 3, 'FD');
+
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(15, 23, 42);
+    pdf.text('VERIFICATION DETAILS', 20, currentY + 10);
+
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(71, 85, 105);
+    pdf.text(`Status: Service Completed & Verified`, 20, currentY + 18);
+    if (clientPhone) pdf.text(`Client Contact: ${clientPhone}`, 20, currentY + 24);
+    if (enableTimestamp && locationText) {
+      pdf.text(`Timestamp: ${new Date().toLocaleString()} (${locationText})`, 110, currentY + 18);
+    }
+
+    // Sign-Off Signature Line
+    currentY += 44;
+    pdf.setDrawColor(203, 213, 225);
+    pdf.line(14, currentY + 12, 90, currentY + 12);
+    pdf.setFontSize(8);
+    pdf.text('Client Signature & Approval', 14, currentY + 17);
+
+    pdf.line(pageWidth - 90, currentY + 12, pageWidth - 14, currentY + 12);
+    pdf.text('Service Technician Signature', pageWidth - 90, currentY + 17);
+
+    // Footer Branding
+    pdf.setFontSize(8);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text('Generated via VeriField Work Verification Platform', pageWidth / 2, 285, { align: 'center' });
+
+    pdf.save(`${businessName ? businessName.replace(/\s+/g, '_') : 'Work'}_Proof_Report.pdf`);
   };
 
   const handleShare = async () => {
@@ -259,7 +316,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 max-w-2xl mx-auto relative">
-      {/* Official VeriField Header with PRO Badge */}
       <header className="py-4 border-b border-slate-800 mb-6 flex items-center justify-between">
         <div className="flex-1 text-center pl-12">
           <div className="flex items-center justify-center mb-1">
@@ -275,7 +331,6 @@ export default function Home() {
           <p className="text-xs text-slate-400">Before & After Work Verification</p>
         </div>
 
-        {/* Upgrade / Pro Button */}
         <button
           onClick={() => setShowProModal(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 font-bold text-xs shadow-md hover:opacity-90 transition-opacity"
@@ -335,7 +390,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* Pro GPS Timestamp Switch */}
           <label className="flex items-center gap-2 cursor-pointer bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
             <input
               type="checkbox"
@@ -353,7 +407,6 @@ export default function Home() {
 
       {/* Photo Upload Cards */}
       <div className="grid grid-cols-2 gap-4 mb-6">
-        {/* Before */}
         <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-700 text-center">
           <p className="text-xs font-semibold text-slate-400 mb-2">BEFORE PHOTO</p>
           {beforeImage ? (
@@ -370,7 +423,6 @@ export default function Home() {
           </label>
         </div>
 
-        {/* After */}
         <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-700 text-center">
           <p className="text-xs font-semibold text-slate-400 mb-2">AFTER PHOTO</p>
           {afterImage ? (
@@ -388,7 +440,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Action Button */}
       <button
         onClick={generateProof}
         disabled={!beforeImage || !afterImage}
@@ -397,28 +448,37 @@ export default function Home() {
         <ImageIcon className="w-4 h-4" /> Generate Branded Proof Image
       </button>
 
-      {/* Output Preview */}
+      {/* Output Section */}
       {generatedResult && (
         <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700 space-y-3">
           <h3 className="text-xs font-bold text-slate-300">RESULT PREVIEW</h3>
           <img src={generatedResult} alt="Generated Proof" className="rounded-lg border border-slate-700 w-full" />
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={handleShare}
-              className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-2 transition-colors"
+              className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors"
             >
-              {sharedStatus ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-              {sharedStatus ? 'Sent!' : 'Share to Client SMS/Email'}
+              {sharedStatus ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+              {sharedStatus ? 'Sent!' : 'Share SMS'}
             </button>
 
             <a
               href={generatedResult}
               download="Branded-Work-Proof.png"
-              className="py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-2 text-center"
+              className="py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 text-center"
             >
-              <Download className="w-4 h-4" /> Download Image
+              <Download className="w-3.5 h-3.5" /> Save PNG
             </a>
+
+            {/* Pro PDF Export Button */}
+            <button
+              onClick={exportPDF}
+              className="py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors relative"
+            >
+              <FileText className="w-3.5 h-3.5" /> PDF Report
+              {!isPro && <Lock className="w-3 h-3 text-amber-300 absolute top-1 right-1" />}
+            </button>
           </div>
         </div>
       )}
