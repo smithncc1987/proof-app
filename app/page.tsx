@@ -62,6 +62,15 @@ export default function Home() {
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
 
   useEffect(() => {
+    // Check if user returned from successful Stripe payment
+    const queryParams = new URLSearchParams(window.location.search);
+    if (queryParams.get('pro') === 'success') {
+      setIsPro(true);
+      localStorage.setItem('verifield_is_pro', 'true');
+    } else if (localStorage.getItem('verifield_is_pro') === 'true') {
+      setIsPro(true);
+    }
+
     const savedName = localStorage.getItem('verifield_biz_name');
     const savedPhone = localStorage.getItem('verifield_biz_phone');
     const savedLogo = localStorage.getItem('verifield_biz_logo');
@@ -87,6 +96,21 @@ export default function Home() {
     localStorage.setItem('verifield_biz_phone', phone);
     localStorage.setItem('verifield_tech_name', tech);
     if (logo) localStorage.setItem('verifield_biz_logo', logo);
+  };
+
+  const handleStripeCheckout = async () => {
+    try {
+      const res = await fetch('/api/checkout', { method: 'POST' });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Something went wrong with Stripe checkout.');
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      alert('Failed to connect to checkout server.');
+    }
   };
 
   const fetchLocation = () => {
@@ -851,15 +875,12 @@ export default function Home() {
 
             <div className="space-y-2 pt-2">
               <button
-                onClick={() => {
-                  setIsPro(true);
-                  setShowProModal(false);
-                }}
+                onClick={handleStripeCheckout}
                 className="w-full py-3 bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 font-extrabold rounded-xl text-sm shadow-lg hover:opacity-95 transition-opacity"
               >
                 Start 7-Day Free Trial ($9.99/mo)
               </button>
-              <p className="text-[10px] text-center text-slate-500">Cancel anytime. Zero commitment.</p>
+              <p className="text-[10px] text-center text-slate-500">Cancel anytime via secure Stripe checkout.</p>
             </div>
           </div>
         </div>
