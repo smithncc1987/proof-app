@@ -36,7 +36,6 @@ export default function Home() {
     w: number,
     h: number
   ) => {
-    // Fill photo box background dark slate
     ctx.fillStyle = '#020617';
     ctx.fillRect(x, y, w, h);
 
@@ -45,13 +44,11 @@ export default function Home() {
     let renderW, renderH, offsetX, offsetY;
 
     if (imgAspect > boxAspect) {
-      // Photo is wider than the box
       renderW = w;
       renderH = w / imgAspect;
       offsetX = x;
       offsetY = y + (h - renderH) / 2;
     } else {
-      // Photo is taller than the box
       renderW = h * imgAspect;
       renderH = h;
       offsetX = x + (w - renderW) / 2;
@@ -82,7 +79,6 @@ export default function Home() {
       imgLogo ? new Promise((resolve) => (imgLogo.onload = resolve)) : Promise.resolve(),
     ]);
 
-    // Setup canvas dimensions
     const targetWidth = 1200;
     const targetHeight = 800;
     const headerHeight = 90;
@@ -91,15 +87,12 @@ export default function Home() {
     canvas.width = targetWidth;
     canvas.height = targetHeight + headerHeight;
 
-    // Background
     ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Header bar
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 0, canvas.width, headerHeight);
 
-    // Business Name / Title
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 28px sans-serif';
     ctx.fillText(businessName || 'Job Proof Verification', padding, 40);
@@ -108,7 +101,6 @@ export default function Home() {
     ctx.font = '16px sans-serif';
     ctx.fillText(`Generated: ${new Date().toLocaleDateString()}`, padding, 68);
 
-    // Draw Watermark Logo in Top Right (if provided)
     if (imgLogo) {
       const logoMaxHeight = 60;
       const logoAspect = imgLogo.width / imgLogo.height;
@@ -122,12 +114,10 @@ export default function Home() {
       );
     }
 
-    // Side-by-side box dimensions
     const imgW = (targetWidth - padding * 3) / 2;
     const imgH = targetHeight - padding * 2;
     const topOffset = headerHeight + padding;
 
-    // Draw Before Frame (Uncropped Contain)
     drawContainImage(ctx, imgBefore, padding, topOffset, imgW, imgH);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
     ctx.fillRect(padding + 10, topOffset + 10, 100, 36);
@@ -135,7 +125,6 @@ export default function Home() {
     ctx.font = 'bold 16px sans-serif';
     ctx.fillText('BEFORE', padding + 25, topOffset + 34);
 
-    // Draw After Frame (Uncropped Contain)
     const afterX = padding * 2 + imgW;
     drawContainImage(ctx, imgAfter, afterX, topOffset, imgW, imgH);
     ctx.fillStyle = 'rgba(34, 197, 94, 0.85)';
@@ -147,7 +136,6 @@ export default function Home() {
     setGeneratedResult(canvas.toDataURL('image/png'));
   };
 
-  // Web Share / SMS / Email Handler
   const handleShare = async () => {
     if (!generatedResult) return;
 
@@ -177,10 +165,21 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 max-w-2xl mx-auto">
-      {/* Official VeriField Header with SVG Logo */}
+      {/* Official VeriField Header with Inline SVG Branding */}
       <header className="py-4 border-b border-slate-800 mb-6 text-center">
         <div className="flex items-center justify-center mb-1">
-          <img src="/logo.svg" alt="VeriField Logo" className="h-10 w-auto object-contain" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" className="h-10 w-auto">
+            {/* Clipboard Body */}
+            <rect x="10" y="10" width="36" height="44" rx="5" fill="#334155" stroke="#475569" strokeWidth="2" />
+            {/* Clipboard Top Clip */}
+            <rect x="20" y="6" width="16" height="7" rx="2" fill="#38bdf8" />
+            {/* Bold Verification Check */}
+            <path d="M 18 32 L 25 39 L 38 22" fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            {/* VeriField Typography */}
+            <text x="58" y="38" fontFamily="system-ui, -apple-system, sans-serif" fontWeight="800" fontSize="27" fill="#ffffff">
+              Veri<tspan fill="#10b981">Field</tspan>
+            </text>
+          </svg>
         </div>
         <p className="text-xs text-slate-400">Before & After Work Verification</p>
       </header>
